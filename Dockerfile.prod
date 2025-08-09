@@ -1,0 +1,23 @@
+FROM python:3.12.2
+
+WORKDIR /app
+
+RUN PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED 1
+ENV DEBUG 0
+
+COPY ./pyproject.toml ./
+
+COPY ./src ./src
+COPY ./.env ./.env
+COPY ./main.py ./main.py
+COPY ./scripts/entrypoint.sh ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/entrypoint.sh
+
+RUN pip install poetry==1.8.3
+
+RUN poetry run poetry install --without dev
+
+EXPOSE 8000
+
+ENTRYPOINT ["./scripts/entrypoint.sh"]
