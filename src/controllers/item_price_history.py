@@ -15,7 +15,7 @@ class ItemPriceHistoryController:
                 gid=payload.gid,
                 quantity=payload.quantity,
                 price=payload.price,
-                recorded_at=payload.recorded_at,
+                recorded_at=datetime.now(),
                 server_id=payload.server_id,
             )
         )

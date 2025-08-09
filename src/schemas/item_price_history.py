@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from pydantic import BaseModel
+from pydantic import BaseModel, PositiveInt
 
 from src.models.item_price_history import QuantityEnum
 
@@ -8,6 +6,5 @@ from src.models.item_price_history import QuantityEnum
 class CreateItemPriceHistorySchema(BaseModel):
     gid: int
     quantity: QuantityEnum
-    price: int
-    recorded_at: datetime
+    price: PositiveInt | None
     server_id: int
