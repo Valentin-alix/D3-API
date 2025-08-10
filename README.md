@@ -1,3 +1,6 @@
+`alembic --config src/alembic/alembic.ini revision --autogenerate`
+`alembic --config src/alembic/alembic.ini upgrade head`
+
 ### Generate init sql & populate
 
 ```

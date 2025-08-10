@@ -19,8 +19,8 @@ QuantitySQLEnum = SQLEnum(QuantityEnum)
 
 class ItemPriceHistory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
-    gid: Mapped[int] = mapped_column(unique=True)
+    gid: Mapped[int]
     quantity: Mapped[QuantityEnum] = mapped_column(QuantitySQLEnum)
-    price: Mapped[int]
+    price: Mapped[int | None]
     recorded_at: Mapped[datetime]
     server_id: Mapped[int]
