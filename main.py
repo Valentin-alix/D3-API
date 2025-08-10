@@ -13,29 +13,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 
-from src.routers import (
-    character,
-    collectable,
-    config_user,
-    equipment,
-    item,
-    job,
-    line,
-    login,
-    map,
-    price,
-    recipe,
-    server,
-    spell,
-    stat,
-    sub_area,
-    template,
-    type_item,
-    user,
-    world,
-    character_path_info,
-    character_path_map,
-)
+from src.routers import item_price_history
 
 
 @asynccontextmanager
@@ -71,27 +49,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(user.router)
-app.include_router(character.router)
-app.include_router(collectable.router)
-app.include_router(item.router)
-app.include_router(job.router)
-app.include_router(map.router)
-app.include_router(price.router)
-app.include_router(recipe.router)
-app.include_router(server.router)
-app.include_router(spell.router)
-app.include_router(sub_area.router)
-app.include_router(type_item.router)
-app.include_router(world.router)
-app.include_router(template.router)
-app.include_router(login.router)
-app.include_router(config_user.router)
-app.include_router(stat.router)
-app.include_router(equipment.router)
-app.include_router(line.router)
-app.include_router(character_path_info.router)
-app.include_router(character_path_map.router)
+app.include_router(item_price_history.router)
 
 
 def is_db_ready(host: str, port: int) -> bool:
@@ -105,7 +63,7 @@ def is_db_ready(host: str, port: int) -> bool:
 
 if __name__ == "__main__":
     os.system(
-        f"docker-compose -f {os.path.join(Path(__file__).parent, "docker-compose.dev.yml")} up -d"
+        f"docker-compose -f {os.path.join(Path(__file__).parent, 'docker-compose.dev.yml')} up -d"
     )
     while not is_db_ready("localhost", 5432):
         sleep(1)

@@ -9,8 +9,8 @@ from src.schemas.item_price_history import CreateItemPriceHistorySchema
 
 class ItemPriceHistoryController:
     @staticmethod
-    def create(session: Session, payload: CreateItemPriceHistorySchema):
-        session.add(
+    def bulk_insert(session: Session, payloads: list[CreateItemPriceHistorySchema]):
+        items_prices_histories = [
             ItemPriceHistory(
                 gid=payload.gid,
                 quantity=payload.quantity,
@@ -18,7 +18,9 @@ class ItemPriceHistoryController:
                 recorded_at=datetime.now(),
                 server_id=payload.server_id,
             )
-        )
+            for payload in payloads
+        ]
+        session.bulk_save_objects(items_prices_histories)
         session.commit()
 
     @staticmethod
