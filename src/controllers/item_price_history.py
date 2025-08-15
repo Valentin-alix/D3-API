@@ -39,7 +39,7 @@ class ItemPriceHistoryController:
         increases = 0
         prev_price = records[0].price
         for curr_price_history in records[1:]:
-            if curr_price_history.price > prev_price:
+            if (curr_price_history.price or 0) > (prev_price or 0):
                 increases += 1
             prev_price = curr_price_history.price
 
@@ -72,5 +72,5 @@ class ItemPriceHistoryController:
         if len(sub) < 2:
             return None
         last, prev = sub[0], sub[1]
-        change = (last.price - prev.price) / prev.price * 100
+        change = ((last.price or 0) - (prev.price or 0)) / (prev.price or 0) * 100
         return change
