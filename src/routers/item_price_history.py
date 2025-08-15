@@ -14,5 +14,8 @@ def bulk_insert_item_price_history(
     session: Session = Depends(session_local),
 ):
     if len(payloads) != 4:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uncorrect amount of price history",
+        )
     ItemPriceHistoryController.bulk_insert(session, payloads)

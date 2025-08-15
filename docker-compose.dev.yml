@@ -2,7 +2,7 @@ services:
   db:
     env_file: ".env"
     image: postgres:16-alpine
-    container_name: ezred2db
+    container_name: scrapingd3db
     ports:
       - 5432:5432
     environment:

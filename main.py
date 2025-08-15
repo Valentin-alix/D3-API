@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import sleep
 
+from dotenv import get_key
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,11 +14,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
 
+from src.const import ENV_PATH
 from src.routers import item_price_history
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    while not is_db_ready(get_key(ENV_PATH, "DB_HOST") or "localhost", 5432):
+        print("waiting for reachable db")
+        sleep(1)
+    os.system(
+        f"poetry run alembic --config {os.path.join(Path(__file__).parent, 'src', 'alembic', 'alembic.ini')} upgrade head"
+    )
     yield
 
 
@@ -65,6 +73,4 @@ if __name__ == "__main__":
     os.system(
         f"docker-compose -f {os.path.join(Path(__file__).parent, 'docker-compose.dev.yml')} up -d"
     )
-    while not is_db_ready("localhost", 5432):
-        sleep(1)
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

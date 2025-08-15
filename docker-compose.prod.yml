@@ -3,9 +3,9 @@ services:
     hostname: postgres
     env_file: ".env"
     image: postgres:16-alpine
-    container_name: ezred2db
+    container_name: scrapingd3db
     ports:
-      - 127.0.0.1:5432:5432
+      - 5432:5432
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USERNAME}
@@ -14,8 +14,8 @@ services:
       - data:/var/lib/postgresql/data
     restart: always
   api:
-    container_name: ezred2api
-    image: ezred2api
+    container_name: scrapingd3api
+    image: scrapingd3api
     depends_on:
       - db
     build:
