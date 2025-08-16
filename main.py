@@ -6,13 +6,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import sleep
 
-from dotenv import get_key
 import uvicorn
+from dotenv import get_key
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import PlainTextResponse
+
+sys.path.append(os.path.join(Path(__file__).parent, "D3Database"))
 
 from src.const import ENV_PATH
 from src.routers import item_price_history

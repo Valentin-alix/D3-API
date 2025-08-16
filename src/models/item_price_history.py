@@ -1,5 +1,5 @@
 from datetime import datetime
-from enum import Enum
+from enum import IntEnum
 
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.models.base import Base
 
 
-class QuantityEnum(Enum):
+class QuantityEnum(IntEnum):
     ONE = 1
     TEN = 10
     HUNDRED = 100

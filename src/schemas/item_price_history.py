@@ -8,3 +8,9 @@ class CreateItemPriceHistorySchema(BaseModel):
     quantity: QuantityEnum
     price: PositiveInt | None
     server_id: int
+
+
+class ReadItemPriceHistorySchema(BaseModel):
+    gid: int
+    quantity: QuantityEnum
+    price: PositiveInt | None

@@ -1,13 +1,32 @@
+import random
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import Float, case, func, select
 from sqlalchemy.orm import Session
 
+from D3Database.data_center.data_reader import DataReader
 from src.models.item_price_history import ItemPriceHistory, QuantityEnum
 from src.schemas.item_price_history import CreateItemPriceHistorySchema
 
 
 class ItemPriceHistoryController:
+    @staticmethod
+    def _generate_random_item_history(session: Session):
+        items: list[ItemPriceHistory] = []
+        for index in range(100):
+            for gid in DataReader().item_by_id:
+                items.append(
+                    ItemPriceHistory(
+                        gid=gid,
+                        quantity=random.choice(list(QuantityEnum)),
+                        price=gid + random.randint(0, 3),
+                        recorded_at=datetime.now() + timedelta(seconds=index),
+                        server_id=-1,
+                    )
+                )
+        session.bulk_save_objects(items)
+        session.commit()
+
     @staticmethod
     def bulk_insert(session: Session, payloads: list[CreateItemPriceHistorySchema]):
         items_prices_histories = [
@@ -24,53 +43,55 @@ class ItemPriceHistoryController:
         session.commit()
 
     @staticmethod
-    def get_sales_speed_from_prices(session: Session, gid: int, quantity: QuantityEnum):
-        records = (
-            session.query(ItemPriceHistory)
-            .filter(ItemPriceHistory.gid == gid)
-            .filter(ItemPriceHistory.quantity == quantity)
-            .order_by(ItemPriceHistory.recorded_at.asc())
-            .all()
-        )
-
-        if len(records) < 2:
-            return None
-
-        increases = 0
-        prev_price = records[0].price
-        for curr_price_history in records[1:]:
-            if (curr_price_history.price or 0) > (prev_price or 0):
-                increases += 1
-            prev_price = curr_price_history.price
-
-        speed = increases / len(records)
-        return speed
-
-    @staticmethod
-    def get_avg_price(session: Session, gid: int, quantity: QuantityEnum, days=7):
-        since = datetime.now() - timedelta(days=days)
-        return (
-            session.query(func.avg(ItemPriceHistory.price))
-            .filter(ItemPriceHistory.gid == gid)
-            .filter(ItemPriceHistory.quantity == quantity)
-            .filter(ItemPriceHistory.recorded_at >= since)
-            .scalar()
-        )
-
-    @staticmethod
-    def get_last_price_percentage_change(
-        session: Session, gid: int, quantity: QuantityEnum
+    def get_sales_speed_from_prices(
+        session: Session, quantity: QuantityEnum, server_id: int
     ):
-        sub = (
-            session.query(ItemPriceHistory)
-            .filter(ItemPriceHistory.gid == gid)
-            .filter(ItemPriceHistory.quantity == quantity)
-            .order_by(ItemPriceHistory.recorded_at.desc())
-            .limit(2)
+        increase_flag = case(
+            (
+                ItemPriceHistory.price
+                > func.lag(ItemPriceHistory.price).over(
+                    partition_by=ItemPriceHistory.gid,
+                    order_by=ItemPriceHistory.recorded_at,
+                ),
+                1,
+            ),
+            else_=0,
+        )
+
+        subq = (
+            session.query(
+                ItemPriceHistory.gid.label("gid"),
+                increase_flag.label("increase_flag"),
+            )
+            .filter(
+                ItemPriceHistory.quantity == quantity,
+                ItemPriceHistory.server_id == server_id,
+            )
+            .subquery()
+        )
+
+        results = (
+            session.query(
+                subq.c.gid,
+                (func.sum(subq.c.increase_flag).cast(Float) / func.count()).label(
+                    "speed"
+                ),
+            )
+            .group_by(subq.c.gid)
             .all()
         )
-        if len(sub) < 2:
-            return None
-        last, prev = sub[0], sub[1]
-        change = ((last.price or 0) - (prev.price or 0)) / (prev.price or 0) * 100
-        return change
+
+        return {gid: speed for gid, speed in results}
+
+    @staticmethod
+    def get_evolution_price(session: Session, quantity: QuantityEnum, server_id: int):
+        return session.scalars(
+            (
+                select(ItemPriceHistory)
+                .filter(
+                    ItemPriceHistory.quantity == quantity,
+                    ItemPriceHistory.server_id == server_id,
+                )
+                .order_by(ItemPriceHistory.recorded_at)
+            )
+        )

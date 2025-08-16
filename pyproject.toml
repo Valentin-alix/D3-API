@@ -16,6 +16,7 @@ alembic = "^1.13.1"
 psycopg2-binary = "^2.9.9"
 uvicorn = "^0.30.1"
 python-dateutil = "^2.9.0.post0"
+msgspec = "^0.19.0"
 
 
 [tool.poetry.group.dev.dependencies]
