@@ -84,14 +84,25 @@ class ItemPriceHistoryController:
         return {gid: speed for gid, speed in results}
 
     @staticmethod
-    def get_evolution_price(session: Session, quantity: QuantityEnum, server_id: int):
+    def get_evolution_price(
+        session: Session, quantity: QuantityEnum, type_id: int, server_id: int
+    ):
+        gids = [
+            item.id
+            for item in DataReader().item_by_id.values()
+            if item.typeId == type_id
+        ]
         return session.scalars(
             (
                 select(ItemPriceHistory)
                 .filter(
                     ItemPriceHistory.quantity == quantity,
                     ItemPriceHistory.server_id == server_id,
+                    ItemPriceHistory.gid.in_(gids),
                 )
                 .order_by(ItemPriceHistory.recorded_at)
             )
         )
+
+    @staticmethod
+    def get_type_ids(session: Session): ...

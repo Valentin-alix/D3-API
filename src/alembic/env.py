@@ -1,13 +1,14 @@
-from logging.config import fileConfig
 import os
-from pathlib import Path
 import sys
+from logging.config import fileConfig
+from pathlib import Path
+
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
 
 sys.path.append(os.path.join(Path(__file__).parent.parent.parent))
+sys.path.append(os.path.join(Path(__file__).parent.parent.parent, "D3Database"))
 
 from src.database import DB_PATH
 from src.models.base import Base
