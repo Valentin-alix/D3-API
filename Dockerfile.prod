@@ -9,6 +9,7 @@ ENV DEBUG 0
 COPY ./pyproject.toml ./
 
 COPY ./src ./src
+COPY ./D3Database ./D3Database
 COPY ./.env ./.env
 COPY ./main.py ./main.py
 COPY ./scripts/entrypoint.sh ./scripts/entrypoint.sh
