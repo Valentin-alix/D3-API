@@ -44,7 +44,7 @@ class ItemPriceHistoryController:
 
     @staticmethod
     def get_sales_speed_from_prices(
-        session: Session, quantity: QuantityEnum, server_id: int
+        session: Session, quantity: QuantityEnum, server_id: int, gids: list[int]
     ):
         increase_flag = case(
             (
@@ -64,6 +64,7 @@ class ItemPriceHistoryController:
                 increase_flag.label("increase_flag"),
             )
             .filter(
+                ItemPriceHistory.gid.in_(gids),
                 ItemPriceHistory.quantity == quantity,
                 ItemPriceHistory.server_id == server_id,
             )
@@ -85,13 +86,21 @@ class ItemPriceHistoryController:
 
     @staticmethod
     def get_evolution_price(
-        session: Session, quantity: QuantityEnum, type_id: int, server_id: int
+        session: Session,
+        quantity: QuantityEnum,
+        server_id: int,
+        type_id: int,
+        item_gid: int | None = None,
     ):
-        gids = [
-            item.id
-            for item in DataReader().item_by_id.values()
-            if item.typeId == type_id
-        ]
+        gids = (
+            [
+                item.id
+                for item in DataReader().item_by_id.values()
+                if item.typeId == type_id
+            ]
+            if item_gid is None
+            else [item_gid]
+        )
         return session.scalars(
             (
                 select(ItemPriceHistory)
@@ -103,6 +112,3 @@ class ItemPriceHistoryController:
                 .order_by(ItemPriceHistory.recorded_at)
             )
         )
-
-    @staticmethod
-    def get_type_ids(session: Session): ...

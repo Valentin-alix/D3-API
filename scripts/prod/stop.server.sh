@@ -7,4 +7,4 @@ docker system prune --force
 
 docker compose -f docker-compose.prod.yml down --remove-orphans
 
-docker rmi ezred2api || true
+docker rmi scrapingd3api || true

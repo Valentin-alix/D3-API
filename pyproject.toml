@@ -17,7 +17,11 @@ psycopg2-binary = "^2.9.9"
 uvicorn = "^0.30.1"
 python-dateutil = "^2.9.0.post0"
 msgspec = "^0.19.0"
+poethepoet = "^0.37.0"
 
+[tool.poe.tasks]
+makemigrations = "alembic --config src/alembic/alembic.ini revision --autogenerate"
+migrate = "alembic --config src/alembic/alembic.ini upgrade head"   
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.10.0"
