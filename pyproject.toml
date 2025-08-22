@@ -20,6 +20,7 @@ msgspec = "^0.19.0"
 poethepoet = "^0.37.0"
 
 [tool.poe.tasks]
+bic = "alembic --config src/alembic/alembic.ini"
 makemigrations = "alembic --config src/alembic/alembic.ini revision --autogenerate"
 migrate = "alembic --config src/alembic/alembic.ini upgrade head"   
 

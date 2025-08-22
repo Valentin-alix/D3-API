@@ -17,7 +17,7 @@ from starlette.responses import PlainTextResponse
 sys.path.append(os.path.join(Path(__file__).parent, "D3Database"))
 
 from src.const import ENV_PATH
-from src.routers import item_price_history, data_center
+from src.routers import item_price_history, data_center, character
 
 
 @asynccontextmanager
@@ -61,6 +61,7 @@ app.add_middleware(
 )
 app.include_router(item_price_history.router)
 app.include_router(data_center.router)
+app.include_router(character.router)
 
 
 def is_db_ready(host: str, port: int) -> bool:
