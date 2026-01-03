@@ -48,3 +48,43 @@ def get_evolution_price(
     return ItemPriceHistoryController.get_evolution_price(
         session, quantity, server_id, type_id, item_gid
     )
+
+
+@router.get("/evaluate_resell")
+def evaluate_resell(
+    gid: int,
+    observed_price: float,
+    server_id: int,
+    quantity: QuantityEnum = QuantityEnum.HUNDRED,
+    lookback_days: int = 30,
+    session: Session = Depends(session_local),
+):
+    """Endpoint pour évaluer si l'achat/revente est potentiellement rentable."""
+    return ItemPriceHistoryController.is_price_resell_profitable(
+        session, gid, quantity, server_id, observed_price, lookback_days
+    )
+
+
+@router.get("/top_profitable_items")
+def get_top_profitable_items(
+    server_id: int,
+    quantity: QuantityEnum = QuantityEnum.HUNDRED,
+    lookback_days: int = 30,
+    min_samples: int = 5,
+    top_n: int = 50,
+    session: Session = Depends(session_local),
+):
+    """Retourne un classement des items les plus rentables à acheter pour revendre.
+
+    Calcule pour chaque item :
+    - Prix moyen, minimum et maximum
+    - Potentiel de profit (différence entre prix moyen et minimum)
+    - Marge de profit en pourcentage
+    - Score de rentabilité (combinaison du potentiel et de la marge)
+    - Volatilité des prix
+
+    Les items sont triés par score de rentabilité décroissant.
+    """
+    return ItemPriceHistoryController.get_top_profitable_items(
+        session, server_id, quantity, lookback_days, min_samples, top_n
+    )

@@ -35,6 +35,10 @@ pyqt5 = "^5.15.10"
 pyqt5-stubs = "^5.15.6.0"
 
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

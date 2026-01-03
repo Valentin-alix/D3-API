@@ -27,6 +27,7 @@ class ItemPriceHistory(Base):
     price: Mapped[int | None]
     recorded_at: Mapped[datetime]
     server_id: Mapped[int]
+    average_price: Mapped[int | None]
 
     @hybrid_property
     def name(self) -> str:
