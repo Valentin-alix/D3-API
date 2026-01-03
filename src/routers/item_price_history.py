@@ -6,6 +6,9 @@ from src.database import session_local
 from src.models.item_price_history import QuantityEnum
 from src.schemas.item_price_history import (
     CreateItemPriceHistorySchema,
+    PriceResellEvaluationSchema,
+    ProfitableCraftSchema,
+    ProfitableItemSchema,
     ReadItemPriceHistorySchema,
 )
 
@@ -50,7 +53,7 @@ def get_evolution_price(
     )
 
 
-@router.get("/evaluate_resell")
+@router.get("/evaluate_resell", response_model=PriceResellEvaluationSchema)
 def evaluate_resell(
     gid: int,
     observed_price: float,
@@ -65,7 +68,7 @@ def evaluate_resell(
     )
 
 
-@router.get("/top_profitable_items")
+@router.get("/top_profitable_items", response_model=list[ProfitableItemSchema])
 def get_top_profitable_items(
     server_id: int,
     quantity: QuantityEnum = QuantityEnum.HUNDRED,
@@ -86,5 +89,30 @@ def get_top_profitable_items(
     Les items sont triés par score de rentabilité décroissant.
     """
     return ItemPriceHistoryController.get_top_profitable_items(
+        session, server_id, quantity, lookback_days, min_samples, top_n
+    )
+
+
+@router.get("/top_profitable_crafts", response_model=list[ProfitableCraftSchema])
+def get_top_profitable_crafts(
+    server_id: int,
+    quantity: QuantityEnum = QuantityEnum.HUNDRED,
+    lookback_days: int = 30,
+    min_samples: int = 5,
+    top_n: int = 50,
+    session: Session = Depends(session_local),
+):
+    """Retourne un classement des items les plus rentables à crafter.
+
+    Pour chaque recette disponible :
+    - Calcule le coût total des ingrédients (basé sur les prix moyens)
+    - Calcule le prix de vente moyen de l'item crafté
+    - Vérifie que l'item crafté se vend (a un historique de prix)
+    - Calcule le profit potentiel (prix de vente - coût de craft)
+    - Calcule la marge de profit en pourcentage
+
+    Les items sont triés par profit potentiel décroissant.
+    """
+    return ItemPriceHistoryController.get_top_profitable_crafts(
         session, server_id, quantity, lookback_days, min_samples, top_n
     )

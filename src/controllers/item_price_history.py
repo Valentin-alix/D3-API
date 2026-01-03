@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from D3Database.data_center.data_reader import DataReader
 from D3Database.data_center.i18n import I18N
 from src.models.item_price_history import ItemPriceHistory, QuantityEnum
-from src.schemas.item_price_history import CreateItemPriceHistorySchema
+from src.schemas.item_price_history import (
+    CreateItemPriceHistorySchema,
+    IngredientDetailSchema,
+    PriceResellEvaluationSchema,
+    ProfitableCraftSchema,
+    ProfitableItemSchema,
+)
 
 
 class ItemPriceHistoryController:
@@ -130,15 +136,11 @@ class ItemPriceHistoryController:
         low_ratio: float = 0.6,
         min_samples: int = 5,
         fraction_higher_needed: float = 0.5,
-    ) -> dict:
+    ) -> PriceResellEvaluationSchema:
         """Détermine si `observed_price` est suffisamment bas par rapport aux prix
         historiques pour envisager un achat/revente rentable.
 
-        Retourne un dict contenant des métriques et une recommandation :
-        - is_low: bool
-        - avg_price, median_price, samples, fraction_higher
-        - recommended_action: 'buy'|'consider'|'avoid'
-        - reason: texte court
+        Retourne un schéma contenant des métriques et une recommandation.
         """
         since = datetime.now() - timedelta(days=lookback_days)
 
@@ -158,15 +160,15 @@ class ItemPriceHistoryController:
         samples = len(prices)
 
         if samples == 0:
-            return {
-                "is_low": False,
-                "avg_price": None,
-                "median_price": None,
-                "samples": 0,
-                "fraction_higher": 0.0,
-                "recommended_action": "avoid",
-                "reason": "no_data",
-            }
+            return PriceResellEvaluationSchema(
+                is_low=False,
+                avg_price=None,
+                median_price=None,
+                samples=0,
+                fraction_higher=0.0,
+                recommended_action="avoid",
+                reason="no_data",
+            )
 
         avg_price = sum(prices) / samples
         sorted_prices = sorted(prices)
@@ -194,15 +196,15 @@ class ItemPriceHistoryController:
             recommended_action = "avoid"
             reason = "not_a_good_margin"
 
-        return {
-            "is_low": is_low,
-            "avg_price": avg_price,
-            "median_price": median_price,
-            "samples": samples,
-            "fraction_higher": fraction_higher,
-            "recommended_action": recommended_action,
-            "reason": reason,
-        }
+        return PriceResellEvaluationSchema(
+            is_low=is_low,
+            avg_price=avg_price,
+            median_price=median_price,
+            samples=samples,
+            fraction_higher=fraction_higher,
+            recommended_action=recommended_action,
+            reason=reason,
+        )
 
     @staticmethod
     def get_top_profitable_items(
@@ -212,7 +214,7 @@ class ItemPriceHistoryController:
         lookback_days: int = 30,
         min_samples: int = 5,
         top_n: int = 50,
-    ) -> list[dict]:
+    ) -> list[ProfitableItemSchema]:
         """Retourne un classement des items les plus rentables à acheter pour revendre.
 
         Calcule pour chaque item ayant des données historiques :
@@ -272,20 +274,163 @@ class ItemPriceHistoryController:
             item_name = I18N().name_by_id[DataReader().item_by_id[gid].nameId]
 
             profitable_items.append(
-                {
-                    "gid": gid,
-                    "name": item_name,
-                    "avg_price": round(avg_price, 2),
-                    "min_price": min_price,
-                    "max_price": max_price,
-                    "profit_potential": round(profit_potential, 2),
-                    "profit_margin_pct": round(profit_margin_pct, 2),
-                    "profitability_score": round(profitability_score, 2),
-                    "volatility": round(std_dev, 2),
-                    "samples": len(prices),
-                }
+                ProfitableItemSchema(
+                    gid=gid,
+                    name=item_name,
+                    avg_price=round(avg_price, 2),
+                    min_price=min_price,
+                    max_price=max_price,
+                    profit_potential=round(profit_potential, 2),
+                    profit_margin_pct=round(profit_margin_pct, 2),
+                    profitability_score=round(profitability_score, 2),
+                    volatility=round(std_dev, 2),
+                    samples=len(prices),
+                )
             )
 
-        profitable_items.sort(key=lambda x: x["profitability_score"], reverse=True)
+        profitable_items.sort(key=lambda x: x.profitability_score, reverse=True)
 
         return profitable_items[:top_n]
+
+    @staticmethod
+    def get_top_profitable_crafts(
+        session: Session,
+        server_id: int,
+        quantity: QuantityEnum = QuantityEnum.HUNDRED,
+        lookback_days: int = 30,
+        min_samples: int = 5,
+        top_n: int = 50,
+    ) -> list[ProfitableCraftSchema]:
+        """Retourne un classement des items les plus rentables à crafter.
+
+        Pour chaque recette disponible :
+        - Calcule le coût total des ingrédients (basé sur les prix moyens)
+        - Calcule le prix de vente moyen de l'item crafté
+        - Vérifie que l'item crafté se vend (a un historique de prix)
+        - Calcule le profit potentiel (prix de vente - coût de craft)
+        - Calcule la marge de profit en pourcentage
+
+        Retourne une liste triée par profit potentiel décroissant.
+        """
+        since = datetime.now() - timedelta(days=lookback_days)
+
+        # Récupérer tous les prix historiques
+        prices_data = (
+            session.query(
+                ItemPriceHistory.gid,
+                ItemPriceHistory.price,
+            )
+            .filter(
+                ItemPriceHistory.quantity == quantity,
+                ItemPriceHistory.server_id == server_id,
+                ItemPriceHistory.recorded_at >= since,
+                ItemPriceHistory.price.isnot(None),
+            )
+            .all()
+        )
+
+        # Calculer le prix moyen pour chaque item
+        items_prices = {}
+        items_price_counts = {}
+        for gid, price in prices_data:
+            if gid not in items_prices:
+                items_prices[gid] = 0
+                items_price_counts[gid] = 0
+            items_prices[gid] += price
+            items_price_counts[gid] += 1
+
+        avg_prices = {
+            gid: items_prices[gid] / items_price_counts[gid]
+            for gid in items_prices
+            if items_price_counts[gid] >= min_samples
+        }
+
+        profitable_crafts = []
+        recipes = DataReader().recipes
+
+        for recipe in recipes:
+            result_id = recipe.resultId
+
+            # Vérifier que l'item crafté se vend (a un historique de prix suffisant)
+            if result_id not in avg_prices:
+                continue
+
+            # Calculer le coût des ingrédients
+            craft_cost = 0
+            all_ingredients_available = True
+
+            for ingredient_id, quantity_needed in zip(
+                recipe.ingredientIds, recipe.quantities
+            ):
+                if ingredient_id not in avg_prices:
+                    # Si un ingrédient n'a pas de prix, on ne peut pas calculer le coût
+                    all_ingredients_available = False
+                    break
+                craft_cost += avg_prices[ingredient_id] * quantity_needed
+
+            if not all_ingredients_available:
+                continue
+
+            # Prix de vente moyen de l'item crafté
+            sell_price = avg_prices[result_id]
+
+            # Profit brut
+            profit = sell_price - craft_cost
+
+            # Ignorer les recettes non rentables
+            if profit <= 0:
+                continue
+
+            # Marge de profit en pourcentage
+            if craft_cost > 0:
+                profit_margin_pct = (profit / craft_cost) * 100
+            else:
+                profit_margin_pct = 0
+
+            # Récupérer les informations de l'item
+            item = DataReader().item_by_id.get(result_id)
+            if not item or not item.nameId:
+                continue
+
+            item_name = I18N().name_by_id.get(item.nameId, f"Item {result_id}")
+
+            # Détails des ingrédients
+            ingredients_detail = []
+            for ingredient_id, quantity_needed in zip(
+                recipe.ingredientIds, recipe.quantities
+            ):
+                ingredient_item = DataReader().item_by_id.get(ingredient_id)
+                ingredient_name = (
+                    I18N().name_by_id.get(ingredient_item.nameId, f"Item {ingredient_id}")
+                    if ingredient_item and ingredient_item.nameId
+                    else f"Item {ingredient_id}"
+                )
+                ingredients_detail.append(
+                    IngredientDetailSchema(
+                        id=ingredient_id,
+                        name=ingredient_name,
+                        quantity=quantity_needed,
+                        unit_price=round(avg_prices[ingredient_id], 2),
+                        total_price=round(
+                            avg_prices[ingredient_id] * quantity_needed, 2
+                        ),
+                    )
+                )
+
+            profitable_crafts.append(
+                ProfitableCraftSchema(
+                    result_id=result_id,
+                    result_name=item_name,
+                    sell_price=round(sell_price, 2),
+                    craft_cost=round(craft_cost, 2),
+                    profit=round(profit, 2),
+                    profit_margin_pct=round(profit_margin_pct, 2),
+                    ingredients=ingredients_detail,
+                    samples=items_price_counts[result_id],
+                )
+            )
+
+        # Trier par profit décroissant
+        profitable_crafts.sort(key=lambda x: x.profit, reverse=True)
+
+        return profitable_crafts[:top_n]
