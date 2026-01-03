@@ -1,6 +1,5 @@
 .venv
 data
-poetry.lock
 *.sql
 pgdata
 .idea

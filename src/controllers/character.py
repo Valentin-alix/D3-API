@@ -2,20 +2,19 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.controllers.utils import get_or_create
 from src.models.character import Character, CharacterActionEnum
 from src.schemas.character import CharacterCreateSchema
 
 
 class CharacterController:
     @staticmethod
-    def get_or_create_character(session: Session, payload: CharacterCreateSchema):
-        does_already_exist = (
-            session.query(Character.id).filter(Character.id == payload.id).first()
-        )
-        if does_already_exist is not None:
-            return
-        session.add(Character(id=payload.id, server_id=payload.server_id))
-        session.commit()
+    def get_or_create_character(
+        session: Session, payload: CharacterCreateSchema
+    ) -> Character:
+        return get_or_create(
+            session, Character, id=payload.id, server_id=payload.server_id
+        )[0]
 
     @staticmethod
     def update_action(session: Session, id: int, action: CharacterActionEnum | None):

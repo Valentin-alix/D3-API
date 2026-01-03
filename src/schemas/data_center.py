@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 
 
-class ItemTypeSchemas(BaseModel):
+class ItemTypeOptionSchema(BaseModel):
     id: int
     name: str
 
 
-class ItemSchemas(BaseModel):
+class ItemOptionSchema(BaseModel):
     id: int
     name: str

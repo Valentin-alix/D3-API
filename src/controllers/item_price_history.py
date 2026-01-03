@@ -11,23 +11,6 @@ from src.schemas.item_price_history import CreateItemPriceHistorySchema
 
 class ItemPriceHistoryController:
     @staticmethod
-    def _generate_random_item_history(session: Session):
-        items: list[ItemPriceHistory] = []
-        for index in range(100):
-            for gid in DataReader().item_by_id:
-                items.append(
-                    ItemPriceHistory(
-                        gid=gid,
-                        quantity=random.choice(list(QuantityEnum)),
-                        price=gid + random.randint(0, 3),
-                        recorded_at=datetime.now() + timedelta(seconds=index),
-                        server_id=-1,
-                    )
-                )
-        session.bulk_save_objects(items)
-        session.commit()
-
-    @staticmethod
     def bulk_insert(session: Session, payloads: list[CreateItemPriceHistorySchema]):
         items_prices_histories = [
             ItemPriceHistory(
@@ -46,6 +29,9 @@ class ItemPriceHistoryController:
     def get_sales_speed_from_prices(
         session: Session, quantity: QuantityEnum, server_id: int, gids: list[int]
     ):
+        """
+        Calculate sales speed based on price history.
+        """
         increase_flag = case(
             (
                 ItemPriceHistory.price
@@ -92,6 +78,7 @@ class ItemPriceHistoryController:
         type_id: int,
         item_gid: int | None = None,
     ):
+        """Get the price evolution for a specific item type and quantity"""
         gids = (
             [
                 item.id
@@ -112,3 +99,21 @@ class ItemPriceHistoryController:
                 .order_by(ItemPriceHistory.recorded_at)
             )
         )
+    
+    @staticmethod
+    def _generate_random_item_history(session: Session):
+        """Just a helper function to generate random item price history, used for debug purpose"""
+        items: list[ItemPriceHistory] = []
+        for index in range(100):
+            for gid in DataReader().item_by_id:
+                items.append(
+                    ItemPriceHistory(
+                        gid=gid,
+                        quantity=random.choice(list(QuantityEnum)),
+                        price=gid + random.randint(0, 3),
+                        recorded_at=datetime.now() + timedelta(seconds=index),
+                        server_id=-1,
+                    )
+                )
+        session.bulk_save_objects(items)
+        session.commit()
