@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from D3Database.data_center.data_reader import DataReader
 from D3Database.data_center.i18n import I18N
+from D3Database.enums.category_item_enum import CategoryEnum
 from src.models.item_price_history import ItemPriceHistory, QuantityEnum
 from src.schemas.item_price_history import (
     CreateItemPriceHistorySchema,
@@ -129,7 +130,7 @@ class ItemPriceHistoryController:
     def is_price_resell_profitable(
         session: Session,
         gid: int,
-        quantity: QuantityEnum,
+        quantity: QuantityEnum | None,
         server_id: int,
         observed_price: float,
         lookback_days: int = 30,
@@ -141,17 +142,25 @@ class ItemPriceHistoryController:
         historiques pour envisager un achat/revente rentable.
 
         Retourne un schéma contenant des métriques et une recommandation.
+
+        Si quantity est None, évalue sur toutes les quantités disponibles.
         """
         since = datetime.now() - timedelta(days=lookback_days)
 
+        # Construire les filtres de base
+        filters = [
+            ItemPriceHistory.gid == gid,
+            ItemPriceHistory.server_id == server_id,
+            ItemPriceHistory.recorded_at >= since,
+        ]
+
+        # Ajouter le filtre de quantité si spécifié
+        if quantity is not None:
+            filters.append(ItemPriceHistory.quantity == quantity)
+
         prices_rows = (
             session.query(ItemPriceHistory.price)
-            .filter(
-                ItemPriceHistory.gid == gid,
-                ItemPriceHistory.quantity == quantity,
-                ItemPriceHistory.server_id == server_id,
-                ItemPriceHistory.recorded_at >= since,
-            )
+            .filter(*filters)
             .order_by(ItemPriceHistory.recorded_at.desc())
             .all()
         )
@@ -210,10 +219,12 @@ class ItemPriceHistoryController:
     def get_top_profitable_items(
         session: Session,
         server_id: int,
-        quantity: QuantityEnum = QuantityEnum.HUNDRED,
+        quantity: QuantityEnum | None = None,
         lookback_days: int = 30,
         min_samples: int = 5,
         top_n: int = 50,
+        category: CategoryEnum | None = None,
+        type_id: int | None = None,
     ) -> list[ProfitableItemSchema]:
         """Retourne un classement des items les plus rentables à acheter pour revendre.
 
@@ -224,21 +235,30 @@ class ItemPriceHistoryController:
         - La volatilité des prix (écart-type)
 
         Retourne une liste triée par rentabilité potentielle.
+
+        Peut être filtré par catégorie, type d'item et quantité.
         """
         since = datetime.now() - timedelta(days=lookback_days)
 
+        # Construire les filtres de base
+        filters = [
+            ItemPriceHistory.server_id == server_id,
+            ItemPriceHistory.recorded_at >= since,
+            ItemPriceHistory.price.isnot(None),
+        ]
+
+        # Ajouter le filtre de quantité si spécifié
+        if quantity is not None:
+            filters.append(ItemPriceHistory.quantity == quantity)
+
+        # Récupérer les données de prix
         prices_data = (
             session.query(
                 ItemPriceHistory.gid,
                 ItemPriceHistory.price,
                 ItemPriceHistory.recorded_at,
             )
-            .filter(
-                ItemPriceHistory.quantity == quantity,
-                ItemPriceHistory.server_id == server_id,
-                ItemPriceHistory.recorded_at >= since,
-                ItemPriceHistory.price.isnot(None),
-            )
+            .filter(*filters)
             .order_by(ItemPriceHistory.gid, ItemPriceHistory.recorded_at)
             .all()
         )
@@ -248,6 +268,22 @@ class ItemPriceHistoryController:
             if gid not in items_data:
                 items_data[gid] = []
             items_data[gid].append(price)
+
+        # Filtrer par catégorie ou type d'item si spécifié
+        data_reader = DataReader()
+        if category is not None or type_id is not None:
+            filtered_gids = set(items_data.keys())
+
+            if category is not None:
+                category_gids = data_reader.item_ids_by_category.get(category, set())
+                filtered_gids &= category_gids
+
+            if type_id is not None:
+                type_gids = data_reader.item_ids_by_type_id.get(type_id, set())
+                filtered_gids &= type_gids
+
+            # Ne garder que les items filtrés
+            items_data = {gid: prices for gid, prices in items_data.items() if gid in filtered_gids}
 
         profitable_items = []
 
@@ -271,7 +307,7 @@ class ItemPriceHistoryController:
 
             profitability_score = profit_potential * profit_margin_pct
 
-            item_name = I18N().name_by_id[DataReader().item_by_id[gid].nameId]
+            item_name = I18N().name_by_id[data_reader.item_by_id[gid].nameId]
 
             profitable_items.append(
                 ProfitableItemSchema(
@@ -296,10 +332,12 @@ class ItemPriceHistoryController:
     def get_top_profitable_crafts(
         session: Session,
         server_id: int,
-        quantity: QuantityEnum = QuantityEnum.HUNDRED,
+        quantity: QuantityEnum | None = None,
         lookback_days: int = 30,
         min_samples: int = 5,
         top_n: int = 50,
+        category: CategoryEnum | None = None,
+        type_id: int | None = None,
     ) -> list[ProfitableCraftSchema]:
         """Retourne un classement des items les plus rentables à crafter.
 
@@ -311,8 +349,21 @@ class ItemPriceHistoryController:
         - Calcule la marge de profit en pourcentage
 
         Retourne une liste triée par profit potentiel décroissant.
+
+        Peut être filtré par catégorie, type d'item et quantité.
         """
         since = datetime.now() - timedelta(days=lookback_days)
+
+        # Construire les filtres de base
+        filters = [
+            ItemPriceHistory.server_id == server_id,
+            ItemPriceHistory.recorded_at >= since,
+            ItemPriceHistory.price.isnot(None),
+        ]
+
+        # Ajouter le filtre de quantité si spécifié
+        if quantity is not None:
+            filters.append(ItemPriceHistory.quantity == quantity)
 
         # Récupérer tous les prix historiques
         prices_data = (
@@ -320,12 +371,7 @@ class ItemPriceHistoryController:
                 ItemPriceHistory.gid,
                 ItemPriceHistory.price,
             )
-            .filter(
-                ItemPriceHistory.quantity == quantity,
-                ItemPriceHistory.server_id == server_id,
-                ItemPriceHistory.recorded_at >= since,
-                ItemPriceHistory.price.isnot(None),
-            )
+            .filter(*filters)
             .all()
         )
 
@@ -345,14 +391,32 @@ class ItemPriceHistoryController:
             if items_price_counts[gid] >= min_samples
         }
 
+        # Filtrer les items par catégorie ou type si spécifié
+        data_reader = DataReader()
+        filtered_result_ids = None
+        if category is not None or type_id is not None:
+            filtered_result_ids = set(avg_prices.keys())
+
+            if category is not None:
+                category_gids = data_reader.item_ids_by_category.get(category, set())
+                filtered_result_ids &= category_gids
+
+            if type_id is not None:
+                type_gids = data_reader.item_ids_by_type_id.get(type_id, set())
+                filtered_result_ids &= type_gids
+
         profitable_crafts = []
-        recipes = DataReader().recipes
+        recipes = data_reader.recipes
 
         for recipe in recipes:
             result_id = recipe.resultId
 
             # Vérifier que l'item crafté se vend (a un historique de prix suffisant)
             if result_id not in avg_prices:
+                continue
+
+            # Filtrer par catégorie/type si spécifié
+            if filtered_result_ids is not None and result_id not in filtered_result_ids:
                 continue
 
             # Calculer le coût des ingrédients
@@ -388,7 +452,7 @@ class ItemPriceHistoryController:
                 profit_margin_pct = 0
 
             # Récupérer les informations de l'item
-            item = DataReader().item_by_id.get(result_id)
+            item = data_reader.item_by_id.get(result_id)
             if not item or not item.nameId:
                 continue
 
@@ -399,7 +463,7 @@ class ItemPriceHistoryController:
             for ingredient_id, quantity_needed in zip(
                 recipe.ingredientIds, recipe.quantities
             ):
-                ingredient_item = DataReader().item_by_id.get(ingredient_id)
+                ingredient_item = data_reader.item_by_id.get(ingredient_id)
                 ingredient_name = (
                     I18N().name_by_id.get(ingredient_item.nameId, f"Item {ingredient_id}")
                     if ingredient_item and ingredient_item.nameId

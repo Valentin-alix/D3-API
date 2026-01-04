@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from D3Database.enums.category_item_enum import CategoryEnum
 from src.controllers.item_price_history import ItemPriceHistoryController
 from src.database import session_local
 from src.models.item_price_history import QuantityEnum
@@ -58,11 +59,19 @@ def evaluate_resell(
     gid: int,
     observed_price: float,
     server_id: int,
-    quantity: QuantityEnum = QuantityEnum.HUNDRED,
+    quantity: QuantityEnum | None = None,
     lookback_days: int = 30,
     session: Session = Depends(session_local),
 ):
-    """Endpoint pour évaluer si l'achat/revente est potentiellement rentable."""
+    """Endpoint pour évaluer si l'achat/revente est potentiellement rentable.
+
+    Paramètres :
+    - gid : ID de l'item à évaluer
+    - observed_price : Prix observé pour cet item
+    - server_id : ID du serveur
+    - quantity : Quantité spécifique à évaluer (None = toutes les quantités)
+    - lookback_days : Nombre de jours d'historique à analyser
+    """
     return ItemPriceHistoryController.is_price_resell_profitable(
         session, gid, quantity, server_id, observed_price, lookback_days
     )
@@ -71,10 +80,12 @@ def evaluate_resell(
 @router.get("/top_profitable_items", response_model=list[ProfitableItemSchema])
 def get_top_profitable_items(
     server_id: int,
-    quantity: QuantityEnum = QuantityEnum.HUNDRED,
+    quantity: QuantityEnum | None = None,
     lookback_days: int = 30,
     min_samples: int = 5,
     top_n: int = 50,
+    category: CategoryEnum | None = None,
+    type_id: int | None = None,
     session: Session = Depends(session_local),
 ):
     """Retourne un classement des items les plus rentables à acheter pour revendre.
@@ -87,19 +98,26 @@ def get_top_profitable_items(
     - Volatilité des prix
 
     Les items sont triés par score de rentabilité décroissant.
+
+    Paramètres de filtrage :
+    - quantity : Quantité spécifique à filtrer (None = toutes les quantités)
+    - category : Catégorie d'items (EQUIPMENT, CONSUMABLES, RESOURCES, QUEST, OTHER, COSMETICS)
+    - type_id : ID du type d'item spécifique
     """
     return ItemPriceHistoryController.get_top_profitable_items(
-        session, server_id, quantity, lookback_days, min_samples, top_n
+        session, server_id, quantity, lookback_days, min_samples, top_n, category, type_id
     )
 
 
 @router.get("/top_profitable_crafts", response_model=list[ProfitableCraftSchema])
 def get_top_profitable_crafts(
     server_id: int,
-    quantity: QuantityEnum = QuantityEnum.HUNDRED,
+    quantity: QuantityEnum | None = None,
     lookback_days: int = 30,
     min_samples: int = 5,
     top_n: int = 50,
+    category: CategoryEnum | None = None,
+    type_id: int | None = None,
     session: Session = Depends(session_local),
 ):
     """Retourne un classement des items les plus rentables à crafter.
@@ -112,7 +130,12 @@ def get_top_profitable_crafts(
     - Calcule la marge de profit en pourcentage
 
     Les items sont triés par profit potentiel décroissant.
+
+    Paramètres de filtrage :
+    - quantity : Quantité spécifique à filtrer (None = toutes les quantités)
+    - category : Catégorie d'items à crafter (EQUIPMENT, CONSUMABLES, RESOURCES, QUEST, OTHER, COSMETICS)
+    - type_id : ID du type d'item à crafter
     """
     return ItemPriceHistoryController.get_top_profitable_crafts(
-        session, server_id, quantity, lookback_days, min_samples, top_n
+        session, server_id, quantity, lookback_days, min_samples, top_n, category, type_id
     )
