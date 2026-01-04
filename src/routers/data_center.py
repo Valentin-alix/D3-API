@@ -22,5 +22,5 @@ def get_items(type_id: int):
     return [
         ItemOptionSchema(id=item.id, name=I18N().name_by_id[item.nameId])
         for item in DataReader().item_by_id.values()
-        if item.typeId is type_id
+        if item.typeId is type_id and item.nameId in I18N().name_by_id
     ]
